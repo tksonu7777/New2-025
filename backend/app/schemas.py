@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class PermissionBase(BaseModel):
     name: str
@@ -15,10 +15,28 @@ class Permission(PermissionBase):
     class Config:
         orm_mode = True
 
+class UrlBase(BaseModel):
+    url: str
+
+class UrlCreate(UrlBase):
+    pass
+
+class Url(UrlBase):
+    id: int
+    is_phishing: bool
+    risk_score: int
+    app_id: int
+
+    class Config:
+        orm_mode = True
+
 class UserBase(BaseModel):
     username: str
 
 class UserCreate(UserBase):
+    password: str
+
+class UserLogin(UserBase):
     password: str
 
 class User(UserBase):
@@ -79,12 +97,29 @@ class AppBase(BaseModel):
     package_name: str
 
 class AppCreate(AppBase):
+    icon_b64: Optional[str] = None
+
+class IconBase(BaseModel):
+    hash: str
+    app_name: str
+
+class IconCreate(IconBase):
     pass
+
+class Icon(IconBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+class AppBulkCreate(BaseModel):
+    apps: List[AppCreate]
 
 class App(AppBase):
     id: int
     is_clone: bool
     is_fake: bool
+    icon_hash: Optional[str] = None
     permissions: List[Permission] = []
     api_calls: List[ApiCall] = []
 

@@ -10,10 +10,12 @@ class App(Base):
     package_name = Column(String, unique=True, index=True)
     is_clone = Column(Boolean, default=False)
     is_fake = Column(Boolean, default=False)
+    icon_hash = Column(String, nullable=True)
     permissions = relationship("Permission", back_populates="app")
     api_calls = relationship("ApiCall", back_populates="app")
     device_healths = relationship("DeviceHealth", back_populates="app")
     network_traffics = relationship("NetworkTraffic", back_populates="app")
+    urls = relationship("Url", back_populates="app")
 
 class Permission(Base):
     __tablename__ = "permissions"
@@ -66,3 +68,21 @@ class NetworkTraffic(Base):
     app_id = Column(Integer, ForeignKey("apps.id"))
 
     app = relationship("App", back_populates="network_traffics")
+
+class Url(Base):
+    __tablename__ = "urls"
+
+    id = Column(Integer, primary_key=True, index=True)
+    url = Column(String, index=True)
+    is_phishing = Column(Boolean, default=False)
+    risk_score = Column(Integer)
+    app_id = Column(Integer, ForeignKey("apps.id"))
+
+    app = relationship("App", back_populates="urls")
+
+class Icon(Base):
+    __tablename__ = "icons"
+
+    id = Column(Integer, primary_key=True, index=True)
+    hash = Column(String, unique=True, index=True)
+    app_name = Column(String)

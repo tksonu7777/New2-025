@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["ABUSEIPDB_API_KEY"] = "test"
+os.environ["VIRUSTOTAL_API_KEY"] = "test"
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool

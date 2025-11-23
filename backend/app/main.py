@@ -1,10 +1,16 @@
 from typing import List
 from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from . import schemas
 from sqlalchemy.orm import Session
 from . import models, schemas, security, crud
 from .database import SessionLocal, engine, Base, get_db
 from .websockets import manager
-from fastapi.security import APIKeyHeader
+from fastapi.security import APIKeyHeader, OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
+from PIL import Image
+import io
+import base64
+from imagehash import average_hash
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
@@ -27,16 +33,41 @@ async def get_current_user(api_key: str = Depends(api_key_header), db: Session =
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return crud.create_user(db=db, user=user)
 
+@app.post("/token")
+async def login_for_access_token(user_login: schemas.UserLogin, db: Session = Depends(get_db)):
+    user = crud.get_user_by_username(db, username=user_login.username)
+    if not user or not crud.verify_password(user_login.password, user.hashed_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return {"access_token": user.api_key, "token_type": "bearer"}
+
+@app.post("/icons/", response_model=schemas.Icon)
+def create_icon(icon: schemas.IconCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return crud.create_icon(db=db, icon=icon)
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
 
 @app.post("/apps/", response_model=schemas.App)
 def create_app(app: schemas.AppCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    analysis_results = security.analyze_app(app)
+    analysis_results = security.analyze_app(db, app)
+    icon_hash_str = None
+    if app.icon_b64:
+        try:
+            image_data = base64.b64decode(app.icon_b64)
+            image = Image.open(io.BytesIO(image_data))
+            icon_hash_str = str(average_hash(image))
+        except Exception as e:
+            print(f"Error processing icon: {e}")
+
     db_app = models.App(
         name=app.name,
         package_name=app.package_name,
+        icon_hash=icon_hash_str,
         is_clone=analysis_results["is_clone"],
         is_fake=analysis_results["is_fake"],
     )
@@ -44,6 +75,34 @@ def create_app(app: schemas.AppCreate, db: Session = Depends(get_db), current_us
     db.commit()
     db.refresh(db_app)
     return db_app
+
+@app.post("/apps/bulk", response_model=List[schemas.App])
+def create_apps(apps: schemas.AppBulkCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    created_apps = []
+    all_icons = crud.get_all_icons(db)
+    for app in apps.apps:
+        analysis_results = security.analyze_app(db, app, all_icons)
+        icon_hash_str = None
+        if app.icon_b64:
+            try:
+                image_data = base64.b64decode(app.icon_b64)
+                image = Image.open(io.BytesIO(image_data))
+                icon_hash_str = str(average_hash(image))
+            except Exception as e:
+                print(f"Error processing icon: {e}")
+        db_app = models.App(
+            name=app.name,
+            package_name=app.package_name,
+            icon_hash=icon_hash_str,
+            is_clone=analysis_results["is_clone"],
+            is_fake=analysis_results["is_fake"],
+        )
+        db.add(db_app)
+        created_apps.append(db_app)
+    db.commit()
+    for app in created_apps:
+        db.refresh(app)
+    return created_apps
 
 @app.get("/apps/", response_model=List[schemas.App])
 def read_apps(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -128,6 +187,25 @@ async def create_network_traffic_for_app(
     if db_network_traffic.is_suspicious:
         await manager.broadcast(f"Suspicious network traffic detected from {db_network_traffic.destination_ip} for app {db_app.name}")
     return db_network_traffic
+
+@app.post("/apps/{app_id}/urls/", response_model=schemas.Url)
+def create_url_for_app(
+    app_id: int, url: schemas.UrlCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+):
+    db_app = db.query(models.App).filter(models.App.id == app_id).first()
+    if db_app is None:
+        raise HTTPException(status_code=404, detail="App not found")
+    analysis_results = security.analyze_url_for_phishing(url)
+    db_url = models.Url(
+        **url.dict(),
+        app_id=app_id,
+        is_phishing=analysis_results["is_phishing"],
+        risk_score=analysis_results["risk_score"],
+    )
+    db.add(db_url)
+    db.commit()
+    db.refresh(db_url)
+    return db_url
 
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: int):
