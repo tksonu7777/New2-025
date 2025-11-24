@@ -86,3 +86,10 @@ class Icon(Base):
     id = Column(Integer, primary_key=True, index=True)
     hash = Column(String, unique=True, index=True)
     app_name = Column(String)
+
+class Screenshot(Base):
+    __tablename__ = "screenshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    hash = Column(String, unique=True, index=True)
+    app_name = Column(String)

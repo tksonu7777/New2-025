@@ -84,6 +84,82 @@ public class MainActivity extends AppCompatActivity {
                 scanInstalledApps();
             }
         });
+
+        Button screenshotButton = findViewById(R.id.screenshotButton);
+        screenshotButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                takeAndUploadScreenshot();
+            }
+        });
+    }
+
+    private void takeAndUploadScreenshot() {
+        Bitmap screenshotBitmap = takeScreenshot();
+        if (screenshotBitmap != null) {
+            String hash = calculateAverageHash(screenshotBitmap);
+            String appName = getApplicationInfo().loadLabel(getPackageManager()).toString();
+
+            Screenshot screenshot = new Screenshot(hash, appName);
+
+            apiService.createScreenshot(apiKey, screenshot).enqueue(new Callback<Void>() {
+                @Override
+                public void onResponse(Call<Void> call, Response<Void> response) {
+                    if (response.isSuccessful()) {
+                        Toast.makeText(MainActivity.this, "Screenshot uploaded successfully", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(MainActivity.this, "Screenshot upload failed: " + response.message(), Toast.LENGTH_SHORT).show();
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<Void> call, Throwable t) {
+                    Toast.makeText(MainActivity.this, "Screenshot upload failed: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            });
+        } else {
+            Toast.makeText(MainActivity.this, "Failed to take screenshot", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private Bitmap takeScreenshot() {
+        View rootView = getWindow().getDecorView().getRootView();
+        rootView.setDrawingCacheEnabled(true);
+        Bitmap bitmap = Bitmap.createBitmap(rootView.getDrawingCache());
+        rootView.setDrawingCacheEnabled(false);
+        return bitmap;
+    }
+
+    private String calculateAverageHash(Bitmap bitmap) {
+        Bitmap resizedBitmap = Bitmap.createScaledBitmap(bitmap, 8, 8, true);
+        long sum = 0;
+        int[] pixels = new int[64];
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                int pixel = resizedBitmap.getPixel(j, i);
+                int grayscale = (int) (0.299 * ((pixel >> 16) & 0xFF) +
+                                       0.587 * ((pixel >> 8) & 0xFF) +
+                                       0.114 * (pixel & 0xFF));
+                pixels[i * 8 + j] = grayscale;
+                sum += grayscale;
+            }
+        }
+        long average = sum / 64;
+        StringBuilder hash = new StringBuilder();
+        for (int pixel : pixels) {
+            if (pixel > average) {
+                hash.append('1');
+            } else {
+                hash.append('0');
+            }
+        }
+        StringBuilder hexHash = new StringBuilder();
+        for (int i = 0; i < hash.length(); i += 4) {
+            String fourBits = hash.substring(i, i + 4);
+            int decimal = Integer.parseInt(fourBits, 2);
+            hexHash.append(Integer.toHexString(decimal));
+        }
+        return hexHash.toString();
     }
 
     private void scanInstalledApps() {

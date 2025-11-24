@@ -13,6 +13,14 @@
         android:layout_centerHorizontal="true"
         android:text="@string/scan_apps" />
 
+    <Button
+        android:id="@+id/screenshotButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_toEndOf="@id/scanButton"
+        android:text="@string/take_screenshot" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
         android:layout_width="match_parent"

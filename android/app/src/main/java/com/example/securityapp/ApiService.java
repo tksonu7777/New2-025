@@ -16,4 +16,7 @@ public interface ApiService {
 
     @POST("token")
     Call<Token> login(@Body User user);
+
+    @POST("screenshots/")
+    Call<Void> createScreenshot(@Header("X-API-KEY") String apiKey, @Body Screenshot screenshot);
 }

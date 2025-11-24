@@ -15,6 +15,19 @@ class Permission(PermissionBase):
     class Config:
         orm_mode = True
 
+class ScreenshotBase(BaseModel):
+    hash: str
+    app_name: str
+
+class ScreenshotCreate(ScreenshotBase):
+    pass
+
+class Screenshot(ScreenshotBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
 class UrlBase(BaseModel):
     url: str
 

@@ -206,6 +206,29 @@ def create_url_for_app(
     db.commit()
     db.refresh(db_url)
     return db_url
+@app.post("/screenshots/", response_model=schemas.Screenshot)
+def create_screenshot(
+    screenshot: schemas.ScreenshotCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Create new screenshot and check for similarity.
+    """
+    # In a real application, you would also save the screenshot file itself.
+    # Here, we're just storing the hash and app name for similarity comparison.
+    db_screenshot = crud.create_screenshot(db=db, screenshot=screenshot)
+
+    # Example of how you might check for similar screenshots
+    # This is a simplified example. A real implementation would be more complex.
+    screenshots = crud.get_screenshots(db)
+    for s in screenshots:
+        if s.id != db_screenshot.id and s.hash == db_screenshot.hash:
+            # Potential clone detected based on screenshot similarity
+            print(f"Potential clone detected: {s.app_name} and {db_screenshot.app_name} have similar screenshots.")
+            # You might want to flag the app or take other actions here
+
+    return db_screenshot
 
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: int):

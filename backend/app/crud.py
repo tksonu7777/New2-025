@@ -34,3 +34,13 @@ def create_user(db: Session, user: schemas.UserCreate):
     db.commit()
     db.refresh(db_user)
     return db_user
+
+def create_screenshot(db: Session, screenshot: schemas.ScreenshotCreate):
+    db_screenshot = models.Screenshot(hash=screenshot.hash, app_name=screenshot.app_name)
+    db.add(db_screenshot)
+    db.commit()
+    db.refresh(db_screenshot)
+    return db_screenshot
+
+def get_screenshots(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Screenshot).offset(skip).limit(limit).all()
